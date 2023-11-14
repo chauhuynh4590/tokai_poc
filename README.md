@@ -1,7 +1,7 @@
-# TOKAI POC
+# TOKAIRIKA POC1
 
 ## Overview
-Quick demo tokai tagname/barcode detection using openvivo library, support intel device.
+Quick demo TokaiRika tagname/barcode detection using Openvino library, support intel device.
 
 ## Installation
 ### Requirements
@@ -20,13 +20,13 @@ Quick demo tokai tagname/barcode detection using openvivo library, support intel
 
 3. Install required packages using pip:
     ```bash
-    pip install -q "openvino-dev>=2023.0.0" "nncf>=2.5.0"
-    pip install -q "ultralytics==8.0.206" onnx
+    pip install -r requirements.txt
     ```
 
 ## Usage
-To test the environment and run the YOLOv8 script, execute the following command in the activated Conda environment:
+Execute the following command in the activated Conda environment:
 
-```bash
-python openvivo_yolov8.py
+   ```bash
+   python GUI.py
+   ```
 
