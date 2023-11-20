@@ -77,13 +77,13 @@ class App:
 
     def quit(self):
         try:
-            print(f"[{SRC.GUI}] - [DEBUG]\n"
-                  f"-----> Avg time: {tokai_debug.yolo_cnt} - {tokai_debug.get_total_time()}\n"
-                  f"-----> Max: {tokai_debug.max_time}\n"
-                  f"-----> YOLO: {tokai_debug.yolo_cnt} - {tokai_debug.get_yolo_time()}\n"
-                  f"-----> DeepSORT: {tokai_debug.ds_cnt} - {tokai_debug.get_ds_time()}\n"
-                  f"-----> Barcode: {tokai_debug.bar_cnt} - {tokai_debug.get_bar_time()}\n"
-                  f"-----> OCR: {tokai_debug.tag_cnt} - {tokai_debug.get_tag_time()}")
+            # print(f"[{SRC.GUI}] - [DEBUG]\n"
+            #       f"-----> Avg time: {tokai_debug.yolo_cnt} - {tokai_debug.get_total_time()}\n"
+            #       f"-----> Max: {tokai_debug.max_time}\n"
+            #       f"-----> YOLO: {tokai_debug.yolo_cnt} - {tokai_debug.get_yolo_time()}\n"
+            #       f"-----> DeepSORT: {tokai_debug.ds_cnt} - {tokai_debug.get_ds_time()}\n"
+            #       f"-----> Barcode: {tokai_debug.bar_cnt} - {tokai_debug.get_bar_time()}\n"
+            #       f"-----> OCR: {tokai_debug.tag_cnt} - {tokai_debug.get_tag_time()}")
 
             self.runUpdate = False
             if self.videoCapture:
