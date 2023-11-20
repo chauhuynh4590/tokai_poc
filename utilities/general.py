@@ -133,11 +133,13 @@ class TokaiDebug:
         self.bar_time = 0.
         self.tag_time = 0.
         self.yolo_time = 0.
+        self.ds_time = 0.
         self.total_time = 0.
         self.max_time = 0.
         self.bar_cnt = 0.
         self.tag_cnt = 0.
         self.yolo_cnt = 0.
+        self.ds_cnt = 0.
         # self.bar_time_start = 0.
         # self.tag_time_start = 0.
 
@@ -165,6 +167,16 @@ class TokaiDebug:
 
     def get_yolo_time(self):
         return "{:.5f}".format(self.yolo_time / self.yolo_cnt) if self.yolo_cnt > 0 else "NO YOLO"
+
+    def ds_start(self):
+        self.ds_time_start = time.time()
+        self.ds_cnt += 1
+
+    def ds_end(self):
+        self.ds_time += time.time() - self.ds_time_start
+
+    def get_ds_time(self):
+        return "{:.5f}".format(self.ds_time / self.ds_cnt) if self.ds_cnt > 0 else "NO DEEPSORT"
 
     def total_end(self):
         dur = time.time() - self.total_time_start

@@ -19,6 +19,7 @@ queue_result = queue.Queue()
 
 pd_ocr_model = PDOCR_MODEL()
 
+
 class OutputLayout:
     def __init__(self):
         self.yolo_out = None
@@ -76,27 +77,6 @@ def decode_barcode(cropimg, id):
     queue_result.put((0, id, barcode_text, tend))
 
 
-# def decode_ocr(rec_res, cropimg):
-#     if rec_res is None:
-#         rec_res = []
-#     image = Image.fromarray(cv2.cvtColor(cropimg, cv2.COLOR_BGR2RGB))
-#     boxes = [np.array(rec_res[i][0], dtype=np.float32) for i in range(len(rec_res))]
-#     txts = [rec_res[i][1][0] for i in range(len(rec_res))]
-#     scores = [rec_res[i][1][1] for i in range(len(rec_res))]
-#
-#     draw_img = draw_ocr_box_txt(
-#         image,
-#         boxes,
-#         txts,
-#         scores,
-#         drop_score=0.5,
-#         font_path=Config.OCR_CHAR_FONT)
-#
-#     ocr_text = "\n".join(i for i in txts)
-#     ocr_img = draw_img[:, :, ::-1]
-#     return ocr_img, ocr_text
-
-
 def make_img_ocr(im, bbox, place, text=''):
     textsizey = text.split("\n")
     text_w = ''
@@ -143,13 +123,20 @@ def make_img_ocr(im, bbox, place, text=''):
     return im
 
 
-def rec_ocr(cropimg, id):
+def rec_ocr(cropimg):
     start = time.time()
-    # rec_res = ocr_det.ocr(cropimg, cls=True)[0]
-    # ocr_img, ocr_text = decode_ocr(rec_res, cropimg)
     ocr_img, ocr_text = pd_ocr_model.run_paddle_ocr(cropimg)
     tend = time.time() - start
-    queue_result.put((1, id, ocr_img, ocr_text, tend))
+    return ocr_img, ocr_text
+
+
+# def rec_ocr(cropimg, id):
+#     start = time.time()
+#     # rec_res = ocr_det.ocr(cropimg, cls=True)[0]
+#     # ocr_img, ocr_text = decode_ocr(rec_res, cropimg)
+#     ocr_img, ocr_text = pd_ocr_model.run_paddle_ocr(cropimg)
+#     tend = time.time() - start
+#     queue_result.put((1, id, ocr_img, ocr_text, tend))
 
 
 def crop(im, bbox, thresholdx=0, thresholdy=0):
@@ -266,11 +253,13 @@ def decode_img(im, BarcodeList1, current_Barcodes):
                 barcode.status = True
                 barcode.cropimg = crop(im_copy, barcode.bbox, 10, 10)
 
-                # rec_res = ocr_det.ocr(barcode.cropimg, cls=True)[0]
-                # barcode.tagname, barcode.ocr_img = ocr_result(barcode.cropimg, rec_res)
-                th2 = Thread(target=rec_ocr, args=(barcode.cropimg, id,))
-                th2.start()
-                total_threads.append(th2)
+                start = time.time()
+                # not use Thread to prevent "Windows fatal exception: access violation" error
+                ocr_img, ocr_text = pd_ocr_model.run_paddle_ocr(barcode.cropimg)
+                tend = time.time() - start
+                BarcodeList[id].tagname = ocr_text
+                BarcodeList[id].ocr_img = ocr_img
+                tokai_debug.add_tag_end(tend)
 
     for th in total_threads:
         th.join()
@@ -285,13 +274,6 @@ def decode_img(im, BarcodeList1, current_Barcodes):
             # print("IDB:", id)
             if txt != "Decode Error":
                 BarcodeList[id].status = True
-
-        else:
-            id, ocr_img, ocr_text, tend = q_item[1], q_item[2], q_item[3], q_item[4]
-            # print("IDo:", id)
-            BarcodeList[id].tagname = ocr_text
-            BarcodeList[id].ocr_img = ocr_img
-            tokai_debug.add_tag_end(tend)
 
     for id, barcode in BarcodeList.items():
         if barcode.isbarcode == 0:
@@ -315,10 +297,9 @@ def decode_img(im, BarcodeList1, current_Barcodes):
             else:
                 barcode_text = barcode_text[0]
 
-            # barcode_text = (barcode_text if len(barcode_text) > 0 and barcode_text != '' else "Decode Error")
             im = make_img_text(im, barcode.bbox, barcode.place, barcode_text)
             detection_result.add_barcode_output(id, barcode_img, barcode_text, int(barcode.conf * 100))
-            # index+=1
+
         # nt_bang: Tag-name processing
         elif barcode.isbarcode == 1:
             orc_cnt += 1

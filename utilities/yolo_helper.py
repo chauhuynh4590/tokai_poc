@@ -53,7 +53,6 @@ class YoloModel:
             masks = result[self.model.output(1)]
         input_hw = input_tensor.shape[2:]
         detections = postprocess(pred_boxes=boxes, input_hw=input_hw, orig_img=image, pred_masks=masks)
-
         return detections
 
 

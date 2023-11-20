@@ -1,6 +1,8 @@
 import queue
 import threading
 import time
+import traceback
+
 import cv2
 
 
@@ -20,9 +22,7 @@ class CVFreshestFrame:
         self.t.start()
 
     def release(self):
-        # print("RELEASE")
         self.running = False
-        # self.t.join(None)
         self.cap.release()
 
     # read frames as soon as they are available, keeping only most recent one
@@ -30,7 +30,7 @@ class CVFreshestFrame:
         while self.running:
             ret, frame = self.cap.read()
             if not ret:
-                # self.q.put(None)
+                self.q.put(None)
                 self.release()
             if not self.q.empty():
                 try:

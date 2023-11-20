@@ -1,51 +1,63 @@
+import cv2
 import numpy as np
 import torch
-import sys
-import gdown
-from os.path import exists as file_exists, join
+
+from openvino import Core
 
 from .sort.nn_matching import NearestNeighborDistanceMetric
 from .sort.detection import Detection
 from .sort.tracker import Tracker
-from .deep.reid_model_factory import show_downloadeable_models, get_model_link, is_model_in_factory, \
-    is_model_type_in_model_path, get_model_type, show_supported_models
-
-# sys.path.append('deep_sort/deep/reid')
-from deep_sort.deep.reid.torchreid.utils import FeatureExtractor
-from deep_sort.deep.reid.torchreid.utils.tools import download_url
-
-show_downloadeable_models()
 
 __all__ = ['DeepSort']
 
+ie_core = Core()
+
+
+class ReIDModel:
+    """
+    This class represents a OpenVINO model object.
+
+    """
+
+    def __init__(self, model_path, batchsize=1, device="CPU"):
+        """
+        Initialize the model object
+
+        Parameters
+        ----------
+        model_path: path of inference model
+        batchsize: batch size of input data
+        device: device used to run inference
+        """
+        self.model = ie_core.read_model(model=model_path)
+        self.input_layer = self.model.input(0)
+        self.input_shape = self.input_layer.shape
+        self.height = self.input_shape[2]
+        self.width = self.input_shape[3]
+
+        for layer in self.model.inputs:
+            input_shape = layer.partial_shape
+            input_shape[0] = batchsize
+            self.model.reshape({layer: input_shape})
+        self.compiled_model = ie_core.compile_model(model=self.model, device_name=device)
+        self.output_layer = self.compiled_model.output(0)
+
+    def predict(self, input):
+        """
+        Run inference
+
+        Parameters
+        ----------
+        input: array of input data
+        """
+        result = self.compiled_model(input)[self.output_layer]
+        return result
+
 
 class DeepSort(object):
-    def __init__(self, model, device, max_dist=0.2, max_iou_distance=0.7, max_age=70, n_init=3, nn_budget=100):
-        # models trained on: market1501, dukemtmcreid and msmt17
-        if is_model_in_factory(model):
-            # download the model
-            model_path = join('deep_sort/deep/checkpoint', model + '.pth')
-            if not file_exists(model_path):
-                gdown.download(get_model_link(model), model_path, quiet=False)
+    def __init__(self, model, max_dist=0.2, max_iou_distance=0.7, max_age=70, n_init=3, nn_budget=100):
 
-            self.extractor = FeatureExtractor(
-                # get rid of dataset information DeepSort model name
-                model_name=model.rsplit('_', 1)[:-1][0],
-                model_path=model_path,
-                device=str(device)
-            )
-        else:
-            if is_model_type_in_model_path(model):
-                model_name = get_model_type(model)
-                self.extractor = FeatureExtractor(
-                    model_name=model_name,
-                    model_path=model,
-                    device=str(device)
-                )
-            else:
-                print('Cannot infere model name from provided DeepSort path, should be one of the following:')
-                show_supported_models()
-                exit()
+        self.extractor = ReIDModel(model, -1)
 
         self.max_dist = max_dist
         metric = NearestNeighborDistanceMetric(
@@ -61,10 +73,6 @@ class DeepSort(object):
         detections = [Detection(bbox_tlwh[i], conf, features[i]) for i, conf in enumerate(
             confidences)]
 
-        # run on non-maximum supression
-        boxes = np.array([d.tlwh for d in detections])
-        scores = np.array([d.confidence for d in detections])
-
         # update tracker
         self.tracker.predict()
         self.tracker.update(detections, classes, confidences)
@@ -77,7 +85,7 @@ class DeepSort(object):
 
             box = track.to_tlwh()
             x1, y1, x2, y2 = self._tlwh_to_xyxy(box)
-            
+
             track_id = track.track_id
             class_id = track.class_id
             conf = track.conf
@@ -91,6 +99,7 @@ class DeepSort(object):
         Convert bbox from xc_yc_w_h to xtl_ytl_w_h
     Thanks JieChen91@github.com for reporting this bug!
     """
+
     @staticmethod
     def _xywh_to_tlwh(bbox_xywh):
         if isinstance(bbox_xywh, np.ndarray):
@@ -117,22 +126,10 @@ class DeepSort(object):
         """
         x, y, w, h = bbox_tlwh
         x1 = max(int(x), 0)
-        x2 = min(int(x+w), self.width - 1)
+        x2 = min(int(x + w), self.width - 1)
         y1 = max(int(y), 0)
-        y2 = min(int(y+h), self.height - 1)
+        y2 = min(int(y + h), self.height - 1)
         return x1, y1, x2, y2
-
-    def increment_ages(self):
-        self.tracker.increment_ages()
-
-    def _xyxy_to_tlwh(self, bbox_xyxy):
-        x1, y1, x2, y2 = bbox_xyxy
-
-        t = x1
-        l = y1
-        w = int(x2 - x1)
-        h = int(y2 - y1)
-        return t, l, w, h
 
     def _get_features(self, bbox_xywh, ori_img):
         im_crops = []
@@ -141,7 +138,43 @@ class DeepSort(object):
             im = ori_img[y1:y2, x1:x2]
             im_crops.append(im)
         if im_crops:
-            features = self.extractor(im_crops)
+            img_batch = batch_preprocess(im_crops, self.extractor.height, self.extractor.width)
+            # return a Tensor to prevent error
+            features = torch.Tensor(self.extractor.predict(img_batch))
         else:
             features = np.array([])
         return features
+
+
+def preprocess(frame, height, width):
+    """
+        Preprocess a single image
+
+        Parameters
+        ----------
+        frame: input frame
+        height: height of model input data
+        width: width of model input data
+        """
+    resized_image = cv2.resize(frame, (width, height))
+    resized_image = resized_image.transpose((2, 0, 1))
+    input_image = np.expand_dims(resized_image, axis=0).astype(np.float32)
+    return input_image
+
+
+def batch_preprocess(img_crops, height, width):
+    """
+        Preprocess batched images
+
+        Parameters
+        ----------
+        img_crops: batched input images
+        height: height of model input data
+        width: width of model input data
+        """
+    img_batch = np.concatenate([
+        preprocess(img, height, width)
+        for img in img_crops
+    ], axis=0)
+    return img_batch
+

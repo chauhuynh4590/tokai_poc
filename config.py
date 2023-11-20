@@ -174,9 +174,6 @@ class AppConfig:
     NO_BARCODE: str = ROOT / r"data/no_barcode.jpg"
     NO_TAGNAME: str = ROOT / r"data/no_tagname.jpg"
 
-    DEEP_SORT_CNF_FILE: str = resource_path(r"data\deep_sort.yaml")
-    DEEP_SORT_MODEL: str = resource_path(r"data\osnet_x0_25_imagenet.pth")
-
     VERSION_LIST: dict = {
         MODEL_VERSIONS[0]: ROOT / f"model/v02_openvino_model/v02.xml",
     }
@@ -185,19 +182,20 @@ class AppConfig:
     FRAME_HEIGHT = int(((FRAME_WIDTH * 9 / 16 + 32) // 32) * 32)
 
     # check area
-    PAD_LEFT: int = 30  # pad PAD_LEFT% of width
-    PAD_RIGHT: int = 2  # pad PAD_RIGHT% of width
+    PAD_LEFT: int = 30  # pad PAD_LEFT -> % of width
+    PAD_RIGHT: int = 2  # pad PAD_RIGHT -> % of width
 
     # openvino device
     DEVICE: str = "CPU"
 
-    # PaddleOCR model (use openvino)
+    # openvino models
     PDOCR_DET_MODEL: str = ROOT / "model/en_PP-OCRv3_det_infer/inference.pdmodel"
     PDOCR_REC_MODEL: str = ROOT / "model/en_PP-OCRv3_rec_infer/inference.pdmodel"
+    REID_MODEL: str = ROOT / "model/person-reidentification-retail-0287/person-reidentification-retail-0287.xml"
 
     APP_CNF_FILE: str = ROOT / "config.cfg"
 
-    try:  # load the old config.csv file
+    try:  # load current config.csv file
         VERSION, CONF_THRES, IOU_THRES, INFER_SIZE = ConfigFile.get_all()
 
     except AppConfigError as e:

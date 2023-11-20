@@ -1,3 +1,4 @@
+import faulthandler
 import os
 import traceback
 import cv2
@@ -25,6 +26,7 @@ from tkinter.ttk import Notebook
 
 from PIL import ImageTk, Image
 
+faulthandler.enable()
 
 def get_data_askfile(title: str):
     Tk().withdraw()  # we don't want a full GUI, so keep the root window from appearing
@@ -75,12 +77,13 @@ class App:
 
     def quit(self):
         try:
-            # print(f"[{SRC.GUI}] - [DEBUG]\n"
-            #       f"-----> Total time: {tokai_debug.yolo_cnt} - {tokai_debug.get_total_time()}\n"
-            #       f"-----> Max time: {tokai_debug.max_time}\n"
-            #       f"-----> Yolo time: {tokai_debug.yolo_cnt} - {tokai_debug.get_yolo_time()}\n"
-            #       f"-----> Bar time: {tokai_debug.bar_cnt} - {tokai_debug.get_bar_time()}\n"
-            #       f"-----> Tag time: {tokai_debug.tag_cnt} - {tokai_debug.get_tag_time()}")
+            print(f"[{SRC.GUI}] - [DEBUG]\n"
+                  f"-----> Avg time: {tokai_debug.yolo_cnt} - {tokai_debug.get_total_time()}\n"
+                  f"-----> Max: {tokai_debug.max_time}\n"
+                  f"-----> YOLO: {tokai_debug.yolo_cnt} - {tokai_debug.get_yolo_time()}\n"
+                  f"-----> DeepSORT: {tokai_debug.ds_cnt} - {tokai_debug.get_ds_time()}\n"
+                  f"-----> Barcode: {tokai_debug.bar_cnt} - {tokai_debug.get_bar_time()}\n"
+                  f"-----> OCR: {tokai_debug.tag_cnt} - {tokai_debug.get_tag_time()}")
 
             self.runUpdate = False
             if self.videoCapture:
@@ -295,7 +298,11 @@ class App:
         try:
             if self.runUpdate:
 
+                # print("Begin detection")
+
                 cnt, img0 = self.videoCapture.read()
+
+                # print("- End detection")
 
                 if not cnt:
                     # print(f"[{SRC.GUI}] - [INFO] - Video is over.")
@@ -319,7 +326,6 @@ class App:
                         self.BacodeList, self.BarcodeCnt, current_Barcodes, img0 = \
                             self.tracker.deepsort_tracking_barcode(img0, self.BacodeList, pred[0], self.BarcodeCnt)
 
-                    # self.BacodeList = {}
                     img0, bar_list, ocr_list = decode_img(img0, self.BacodeList, current_Barcodes)
 
                     tokai_debug.total_end()
@@ -341,7 +347,8 @@ class App:
                             img, txt = self.show_biz.bar_list[0]["smash"]
                             img_bar1 = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
                             self.photo_bar1 = ImageTk.PhotoImage(image=Image.fromarray(img_bar1))
-                            self.barcode_1_img.configure(image=self.photo_bar1, background=self.defaultBackground, text="")
+                            self.barcode_1_img.configure(image=self.photo_bar1, background=self.defaultBackground,
+                                                         text="")
                             self.barcode_1_txt.configure(text=txt)
 
                         if self.show_biz.bar_list[1]["will"]:
@@ -374,7 +381,8 @@ class App:
                                 self.show_biz.add_ocr(ocr_list[0][0])
                                 img_ocr = cv2.cvtColor(ocr_list[0][1], cv2.COLOR_BGR2RGB)
                                 self.photo_ocr = ImageTk.PhotoImage(image=Image.fromarray(img_ocr))
-                                self.ocr_1_img.configure(image=self.photo_ocr, background=self.defaultBackground, text="")
+                                self.ocr_1_img.configure(image=self.photo_ocr, background=self.defaultBackground,
+                                                         text="")
                                 self.ocr_1_txt.configure(text=ocr_list[0][2])
 
                 self.window.after(10, self.update_detection)

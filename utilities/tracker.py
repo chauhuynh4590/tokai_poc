@@ -1,27 +1,18 @@
-import cv2
-
-from deep_sort.utils.parser import get_config
-from deep_sort.deep_sort import DeepSort
-from utilities.general import xyxy2xywh
+from utilities.general import xyxy2xywh, tokai_debug
 from utilities.barcode import Barcode
+from deep_sort import DeepSort
 from config import Config
-
-# initialize deepsort
-cfg = get_config()
-# cfg.merge_from_file(opt.config_deepsort)
-cfg.merge_from_file(Config.DEEP_SORT_CNF_FILE)
 
 
 class Tracker:
     def __init__(self):
 
-        self.deepsort = DeepSort(Config.DEEP_SORT_MODEL,
-                                 "cpu",
-                                 max_dist=cfg.DEEPSORT.MAX_DIST,
-                                 max_iou_distance=cfg.DEEPSORT.MAX_IOU_DISTANCE,
-                                 max_age=100,  # cfg.DEEPSORT.MAX_AGE,
+        self.deepsort = DeepSort(Config.REID_MODEL,
+                                 max_dist=0.2,
+                                 max_iou_distance=0.7,
+                                 max_age=100,
                                  n_init=0,
-                                 nn_budget=cfg.DEEPSORT.NN_BUDGET,
+                                 nn_budget=100,
                                  )
 
     def deepsort_tracking_barcode(self, img0, barcode_list, torch_barcode, barcode_cnt):
@@ -29,33 +20,35 @@ class Tracker:
         xywhs = xyxy2xywh(torch_barcode[:, 0:4])
         confs = torch_barcode[:, 4]
         clss = torch_barcode[:, 5]
-        # print(clss)
+
+        tokai_debug.ds_start()
         outputs = self.deepsort.update(xywhs.cpu(), confs.cpu(), clss.cpu(), img0)
+        tokai_debug.ds_end()
+
         im = img0.copy()
         current_barcode = []
 
         # use for check missing
         h, w, _ = img0.shape
-        buff = 10
+        buff = 20
+        a = h * w // 16  # 1/16 of image's area
         w -= buff
         h -= buff
 
-        # print(outputs)
         for output in outputs:
-            # print(output)
             bbox = tuple((int(ele) for ele in output[0:4]))
 
             # nt_bang: make sure the object is not missing any part
-            if bbox[0] < buff or bbox[1] < buff or bbox[2] > w or bbox[3] > h:
+            if bbox[0] < buff or bbox[1] < buff or bbox[2] > w or bbox[3] > h or \
+                    (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) > a:  # the area should not too large
                 continue
-            # print(bbox)
+            # print(w, h, bbox, (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]), a)
 
             obj_id = str(output[4])
             c = int(output[5])
             conf = int(output[6])
             # cv2.putText(im, f"{obj_id}", (bbox[0] - 20, bbox[1] + 10), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 0, 255), 3)
 
-            # if c == 0:
             current_barcode.append(obj_id)
             if obj_id not in barcode_list.keys():  # not detected yet
                 # print(f"New {name}: - id = {obj_id}")
@@ -65,6 +58,3 @@ class Tracker:
                 barcode_list[obj_id].update_self_bbox(bbox)
 
         return barcode_list, barcode_cnt, current_barcode, im
-
-    def increment_ages(self):
-        self.deepsort.increment_ages()
